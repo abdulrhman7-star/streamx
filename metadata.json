@@ -1,0 +1,8 @@
+{
+  "name": "Remix Akwam Movie \u0026 Series Streamer",
+  "description": "منصة شاملة لتصفح والبحث وتحميل ومشاهدة أحدث الأفلام والمسلسلات مع استخراج روابط المشاهدة والتحميل المباشرة والتصفية المتقدمة",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
