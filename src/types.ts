@@ -33,6 +33,11 @@ export interface Episode {
   quality?: string;
 }
 
+export interface Season {
+  title: string;
+  link: string;
+}
+
 export interface MediaDetail extends MediaItem {
   originalTitle?: string;
   backdrop?: string;
@@ -42,6 +47,7 @@ export interface MediaDetail extends MediaItem {
   downloadLinks: DownloadLink[];
   watchServers: StreamServer[];
   episodes?: Episode[];
+  seasons?: Season[];
 }
 
 export interface FilterState {

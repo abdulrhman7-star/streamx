@@ -77,8 +77,8 @@ export async function checkApiHealth(): Promise<{ status: string; target: string
  * Automatically scans series pages, extracts episode links, and caches them in localStorage
  * to reduce API usage and improve performance.
  */
-export async function autoResolveEpisodes(seriesUrl: string): Promise<Episode[]> {
-  const cacheKey = `episodes_cache_${seriesUrl}`;
+export async function autoResolveSeriesData(seriesUrl: string): Promise<{episodes: Episode[], seasons?: {title: string, link: string}[]}> {
+  const cacheKey = `series_data_cache_${seriesUrl}`;
   
   // 1. Check Local Cache
   try {
@@ -88,7 +88,7 @@ export async function autoResolveEpisodes(seriesUrl: string): Promise<Episode[]>
       // Cache TTL: 2 hours (in milliseconds)
       const CACHE_TTL = 2 * 60 * 60 * 1000; 
       if (Date.now() - parsedCache.timestamp < CACHE_TTL) {
-        console.log('Returned episodes from cache:', seriesUrl);
+        console.log('Returned series data from cache:', seriesUrl);
         return parsedCache.data;
       }
     }
@@ -102,25 +102,28 @@ export async function autoResolveEpisodes(seriesUrl: string): Promise<Episode[]>
     if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
     const data = await res.json();
     
-    if (data.success && data.episodes) {
-      const episodes: Episode[] = data.episodes.map((ep: any, index: number) => ({
+    if (data.success) {
+      const episodes: Episode[] = (data.episodes || []).map((ep: any, index: number) => ({
         ...ep,
         episodeNumber: ep.episodeNumber || index + 1
       }));
+      const seasons = data.seasons || [];
+      const result = { episodes, seasons };
+      
       // 3. Save to Cache
       try {
         localStorage.setItem(cacheKey, JSON.stringify({
           timestamp: Date.now(),
-          data: episodes
+          data: result
         }));
       } catch (e) {
         console.warn('Cache write error:', e);
       }
-      return episodes;
+      return result;
     }
-    return [];
+    return { episodes: [] };
   } catch (error) {
-    console.error('Error auto resolving episodes:', error);
+    console.error('Error auto resolving series data:', error);
     throw error;
   }
 }

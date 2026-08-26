@@ -9,33 +9,23 @@ const app = express();
 const PORT = 3000;
 const BASE_URL = 'https://ak.sv';
 
-app.use(cors({
-  origin: function (origin, callback) {
-    if (
-      !origin ||
-      origin.includes('run.app') ||
-      origin.includes('localhost') ||
-      origin.includes('ak.sv') ||
-      origin.includes('akwam.cx')
-    ) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  methods: ['GET', 'POST', 'HEAD', 'OPTIONS'],
-}));
+app.use(cors());
 
 app.use((req: Request, res: Response, next: NextFunction) => {
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader(
-    'Content-Security-Policy',
-    "default-src 'self'; connect-src 'self' https:; media-src 'self' blob: data: https:; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https:;"
-  );
+  // Relaxed headers to prevent iframe blocking in preview environments
+  res.removeHeader('X-Frame-Options');
   next();
 });
 
 app.use(express.json());
+
+// Utility to clean broken video URLs (e.g. from downet)
+function cleanVideoUrl(rawUrl: string): string {
+  if (!rawUrl) return '';
+  let cleaned = rawUrl.replace(/^(https?:\/\/ak\.sv)?(vlc:\/\/|intent:)/i, '');
+  cleaned = cleaned.split('#Intent')[0];
+  return cleaned;
+}
 
 // Realistic Browser Headers extracted from real ak.sv HAR requests
 const DEFAULT_HEADERS = {
@@ -1019,7 +1009,7 @@ app.get('/api/get-links', async (req: Request, res: Response) => {
       const type = $(el).attr('type') || 'video/mp4';
       const size = $(el).attr('size') || 'unknown';
       if (src) {
-        links.push({ url: src, type, size });
+        links.push({ url: cleanVideoUrl(src), type, size });
       }
     });
     
@@ -1028,7 +1018,7 @@ app.get('/api/get-links', async (req: Request, res: Response) => {
       const sourceRegex = /<source\s+src="([^"]+)"(?:[^>]*size="([^"]+)")?[^>]*>/g;
       let match;
       while ((match = sourceRegex.exec(html)) !== null) {
-        links.push({ url: match[1], type: 'video/mp4', size: match[2] || 'unknown' });
+        links.push({ url: cleanVideoUrl(match[1]), type: 'video/mp4', size: match[2] || 'unknown' });
       }
     }
 
@@ -1080,13 +1070,86 @@ app.get('/api/series-episodes', async (req: Request, res: Response) => {
       }
     });
     
+    const seasons: { title: string, link: string }[] = [];
+    $('h2, h3').filter((_, el) => $(el).text().includes('مواسم اخرى') || $(el).text().includes('مواسم العمل')).closest('div').find('.entry-box, a[href*="/series/"]').each((_, el) => {
+      let link = $(el).attr('href') || $(el).find('a').attr('href');
+      let title = $(el).text().replace(/\s+/g, ' ').trim();
+      if (!title || title.includes('مشاهدة')) {
+         title = $(el).find('img').attr('alt') || $(el).find('.entry-title, h3').text().trim() || title.replace('مشاهدة', '').trim();
+      }
+      if (link && !seasons.some(s => s.link === link)) {
+         seasons.push({ 
+           title: title || 'موسم آخر', 
+           link: link.startsWith('http') ? link : `${BASE_URL}${link}` 
+         });
+      }
+    });
+
     // Sort logic maybe? If they come in reverse order, reverse them? 
     // They usually come from newest to oldest. We'll return them as they are.
 
-    res.json({ success: true, episodes });
+    res.json({ success: true, episodes, seasons });
   } catch (error: any) {
     console.error('Error extracting episodes:', error.message);
     res.status(500).json({ error: 'Failed to extract episodes' });
+  }
+});
+
+// -------------------------------------------------------------
+// NEW: API endpoint to handle download with Content-Disposition
+// -------------------------------------------------------------
+app.get('/api/download', async (req: Request, res: Response) => {
+  const videoUrl = req.query.url as string;
+  if (!videoUrl) return res.status(400).send('Video URL is required');
+
+  try {
+    const response = await axios({
+      method: 'GET',
+      url: videoUrl,
+      headers: {
+        'Referer': process.env.SOURCE_REFERER || BASE_URL,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      },
+      responseType: 'stream',
+      timeout: 25000,
+    });
+
+    const filename = 'Akwam_Video_' + Date.now() + (videoUrl.includes('.m3u8') ? '.m3u8' : '.mp4');
+
+    res.set({
+      'Content-Type': 'application/octet-stream',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      ...(response.headers['content-length'] ? { 'Content-Length': response.headers['content-length'] } : {}),
+    });
+
+    response.data.pipe(res);
+  } catch (error: any) {
+    console.error('Error downloading video:', error.message);
+    res.status(502).send('Failed to download video from source');
+  }
+});
+
+// -------------------------------------------------------------
+// NEW: API endpoint for direct watch (combines get-link + stream)
+// -------------------------------------------------------------
+app.get('/api/watch', async (req: Request, res: Response) => {
+  const pageUrl = req.query.url as string;
+  if (!pageUrl) return res.status(400).send('Page URL is required');
+
+  try {
+    const getLinkRes = await axios.get(`http://localhost:${PORT}/api/get-links?url=${encodeURIComponent(pageUrl)}`);
+    const links = getLinkRes.data.links;
+    
+    if (links && links.length > 0) {
+      // Pick the best quality or first link
+      const cleanUrl = links[0].url;
+      res.redirect(`/api/proxy-video?url=${encodeURIComponent(cleanUrl)}`);
+    } else {
+      res.status(404).send('No video found to watch');
+    }
+  } catch (error: any) {
+    console.error('Error in watch endpoint:', error.message);
+    res.status(500).send('Failed to start watch');
   }
 });
 

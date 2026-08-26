@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MediaItem, MediaDetail } from '../types';
-import { fetchMediaDetail, autoResolveEpisodes } from '../services/api';
+import { fetchMediaDetail, autoResolveSeriesData } from '../services/api';
 import {
   X,
   ArrowRight,
@@ -24,9 +24,10 @@ interface MediaModalProps {
   item: MediaItem | null;
   onClose: () => void;
   onWatchVideo: (serverUrl: string, title: string) => void;
+  onSearch?: (query: string) => void;
 }
 
-export const MediaModal: React.FC<MediaModalProps> = ({ item, onClose, onWatchVideo }) => {
+export const MediaModal: React.FC<MediaModalProps> = ({ item, onClose, onWatchVideo, onSearch }) => {
   const [detail, setDetail] = useState<MediaDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [extractedLinks, setExtractedLinks] = useState<{url: string, type: string, size: string}[] | null>(null);
@@ -90,12 +91,15 @@ export const MediaModal: React.FC<MediaModalProps> = ({ item, onClose, onWatchVi
       .then(async (data) => {
         if (!isMounted.current) return;
         
-        // If it's a series, fetch real episodes from our new API
+        // If it's a series, fetch real episodes and seasons from our new API
         if (data.type === 'series') {
           try {
-            const episodes = await autoResolveEpisodes(item.link);
-            if (episodes && episodes.length > 0) {
-              data.episodes = episodes;
+            const seriesData = await autoResolveSeriesData(item.link);
+            if (seriesData.episodes && seriesData.episodes.length > 0) {
+              data.episodes = seriesData.episodes;
+            }
+            if (seriesData.seasons && seriesData.seasons.length > 0) {
+              data.seasons = seriesData.seasons;
             }
           } catch (e) {
             console.error('Failed to fetch series episodes:', e);
@@ -246,6 +250,32 @@ export const MediaModal: React.FC<MediaModalProps> = ({ item, onClose, onWatchVi
             {/* Content Tabs & Sections */}
             <div className="p-6 sm:p-8 space-y-6">
               
+              {/* Seasons (If Series) */}
+              {detail.type === 'series' && detail.seasons && detail.seasons.length > 0 && (
+                <div className="space-y-3 mb-6">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                      <Layers className="w-4 h-4 text-orange-400" />
+                      <span>مواسم وأجزاء أخرى:</span>
+                    </h3>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {detail.seasons.map((season, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => {
+                          if (onSearch) onSearch(season.title);
+                          onClose();
+                        }}
+                        className="px-3 py-1.5 rounded-full border border-slate-700 hover:border-orange-500/50 bg-[#0f172a] hover:bg-orange-600/10 text-xs font-medium text-slate-300 hover:text-orange-400 transition"
+                      >
+                        {season.title}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
               {/* 1. Series Episodes (If Series) */}
               {detail.type === 'series' && detail.episodes && (
                 <div className="space-y-3">
@@ -337,7 +367,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({ item, onClose, onWatchVi
                              </button>
                              
                              <a
-                               href={link.url}
+                               href={`/api/download?url=${encodeURIComponent(link.url)}`}
                                target="_blank"
                                rel="noopener noreferrer"
                                className="px-3 py-2 rounded border border-slate-700 bg-[#1e293b] hover:bg-slate-700 text-slate-300 hover:text-white text-xs transition flex items-center gap-1.5 cursor-pointer"

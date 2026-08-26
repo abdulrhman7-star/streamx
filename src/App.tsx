@@ -311,6 +311,7 @@ export default function App() {
       <MediaModal
         item={selectedMedia}
         onClose={() => setSelectedMedia(null)}
+        onSearch={setSearchQuery}
         onWatchVideo={(url, title) => {
           setSelectedMedia(null);
           setPlayerState({ url, title });
