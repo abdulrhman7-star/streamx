@@ -1,4 +1,4 @@
-import express, { Request, Response } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
@@ -9,7 +9,32 @@ const app = express();
 const PORT = 3000;
 const BASE_URL = 'https://ak.sv';
 
-app.use(cors());
+app.use(cors({
+  origin: function (origin, callback) {
+    if (
+      !origin ||
+      origin.includes('run.app') ||
+      origin.includes('localhost') ||
+      origin.includes('ak.sv') ||
+      origin.includes('akwam.cx')
+    ) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'POST', 'HEAD', 'OPTIONS'],
+}));
+
+app.use((req: Request, res: Response, next: NextFunction) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; connect-src 'self' https:; media-src 'self' blob: data: https:; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https:;"
+  );
+  next();
+});
+
 app.use(express.json());
 
 // Realistic Browser Headers extracted from real ak.sv HAR requests
@@ -788,6 +813,56 @@ app.get('/api/v1/movie-details', async (req: Request, res: Response) => {
 });
 
 // -------------------------------------------------------------
+// NEW: Hotlink Protection Middleware
+// يحمي هذا النظام ملفاتك المستضافة من الربط الساخن من قبل مواقع غير مصرح لها
+// -------------------------------------------------------------
+const ALLOWED_HOTLINK_DOMAINS = [
+  process.env.FRONTEND_URL || 'http://localhost:3000',
+  'https://ak.sv', // السماح لموقع ak.sv أو المواقع الشريكة بتضمين ملفاتك
+  'http://ak.sv'
+];
+
+const hotlinkProtection = (req: Request, res: Response, next: NextFunction) => {
+  const referer = req.get('Referer') || req.get('Origin');
+
+  // السماح بالطلبات المباشرة (مثل فتح الرابط في المتصفح مباشرة)
+  // إذا أردت منع حتى الطلبات المباشرة، قم بتغيير السطر أدناه ليرجع 403
+  if (!referer) {
+    return next();
+  }
+
+  try {
+    const refererUrl = new URL(referer);
+    const refererOrigin = refererUrl.origin;
+
+    const isAllowed = ALLOWED_HOTLINK_DOMAINS.some(domain => refererOrigin === domain || refererOrigin.endsWith(domain));
+
+    if (isAllowed) {
+      next(); // الموقع مصرح له، مرر الطلب
+    } else {
+      console.warn(`[Hotlink Blocked] Unauthorized request from: ${refererOrigin}`);
+      res.status(403).json({
+        error: 'Hotlinking Forbidden',
+        message: 'غير مصرح لهذا الموقع بعرض هذه الوسائط.'
+      });
+    }
+  } catch (err) {
+    // فشل في تحليل الـ Referer
+    res.status(400).send('Invalid Referer');
+  }
+};
+
+// مسار تجريبي لمحاكاة ملفات الفيديو المستضافة على خادمك وتطبيق الحماية عليها
+app.get('/api/v1/hosted-media/:filename', hotlinkProtection, (req: Request, res: Response) => {
+  // في بيئة الإنتاج، هنا تقوم بقراءة الملف الفعلي من الخادم (fs.createReadStream)
+  // وإرساله للمستخدم. هنا نرسل رسالة نجاح للمحاكاة.
+  res.json({
+    success: true,
+    message: `تم السماح بالوصول لملف ${req.params.filename}. موقعك أو الموقع الشريك مصرح له بالربط الساخن.`
+  });
+});
+
+// -------------------------------------------------------------
 // 4. API: Video Stream Proxy & Stream Resolver (with SSRF protection & Range support)
 // -------------------------------------------------------------
 function isPrivateOrLocalHost(hostname: string): boolean {
@@ -850,13 +925,47 @@ const handleVideoStreamProxy = async (req: Request, res: Response) => {
       timeout: 25000,
     });
 
-    const contentType =
+    const contentType = String(
       response.headers['content-type'] ||
       (videoUrl.endsWith('.m3u8')
         ? 'application/vnd.apple.mpegurl'
         : videoUrl.endsWith('.ts')
         ? 'video/mp2t'
-        : 'video/mp4');
+        : 'video/mp4')
+    );
+
+    // Rewrite M3U8 playlists to proxy segments as well
+    if (contentType.includes('mpegurl') || contentType.includes('m3u')) {
+      const chunks: Buffer[] = [];
+      response.data.on('data', (chunk: Buffer) => chunks.push(chunk));
+      response.data.on('end', () => {
+        const m3u8Content = Buffer.concat(chunks).toString('utf-8');
+        const baseUrl = videoUrl.substring(0, videoUrl.lastIndexOf('/') + 1);
+        const rewritten = m3u8Content.split('\n').map(line => {
+          const trimmed = line.trim();
+          if (trimmed && !trimmed.startsWith('#')) {
+            const absoluteUrl = trimmed.startsWith('http') ? trimmed : new URL(trimmed, baseUrl).href;
+            return `/api/proxy-video?url=${encodeURIComponent(absoluteUrl)}`;
+          } else if (trimmed.startsWith('#EXT-X-STREAM-INF:') || trimmed.startsWith('#EXT-X-I-FRAME-STREAM-INF:')) {
+            return trimmed.replace(/URI="(.*?)"/g, (match, uri) => {
+              const absoluteUrl = uri.startsWith('http') ? uri : new URL(uri, baseUrl).href;
+              return `URI="/api/proxy-video?url=${encodeURIComponent(absoluteUrl)}"`;
+            });
+          }
+          return line;
+        }).join('\n');
+        
+        res.set({
+          'Content-Type': contentType,
+          'Content-Length': Buffer.byteLength(rewritten),
+        });
+        res.status(response.status).send(rewritten);
+      });
+      response.data.on('error', (err: any) => {
+        if (!res.headersSent) res.status(502).end();
+      });
+      return;
+    }
 
     res.set({
       'Content-Type': contentType,
@@ -881,6 +990,105 @@ app.get('/api/proxy-video', handleVideoStreamProxy);
 app.head('/api/proxy-video', handleVideoStreamProxy);
 app.get('/api/v1/stream-proxy', handleVideoStreamProxy);
 app.head('/api/v1/stream-proxy', handleVideoStreamProxy);
+
+// -------------------------------------------------------------
+// NEW: API endpoint to extract video source links from a URL
+// -------------------------------------------------------------
+
+app.get('/api/get-links', async (req: Request, res: Response) => {
+  const pageUrl = req.query.url as string;
+  if (!pageUrl) {
+    return res.status(400).json({ error: 'Page URL is required' });
+  }
+
+  try {
+    const htmlResponse = await axios.get(pageUrl, {
+      headers: { 
+        'Referer': process.env.SOURCE_REFERER || BASE_URL,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    });
+
+    const html = htmlResponse.data;
+    const $ = cheerio.load(html);
+    const links: { url: string, type: string, size: string }[] = [];
+
+    // Extract links from <video> -> <source> elements
+    $('video source').each((_, el) => {
+      const src = $(el).attr('src');
+      const type = $(el).attr('type') || 'video/mp4';
+      const size = $(el).attr('size') || 'unknown';
+      if (src) {
+        links.push({ url: src, type, size });
+      }
+    });
+    
+    // Also try simple regex if no sources were found via cheerio
+    if (links.length === 0) {
+      const sourceRegex = /<source\s+src="([^"]+)"(?:[^>]*size="([^"]+)")?[^>]*>/g;
+      let match;
+      while ((match = sourceRegex.exec(html)) !== null) {
+        links.push({ url: match[1], type: 'video/mp4', size: match[2] || 'unknown' });
+      }
+    }
+
+    res.json({ success: true, links });
+  } catch (error: any) {
+    console.error('Error extracting links:', error.message);
+    res.status(500).json({ error: 'Failed to extract links' });
+  }
+});
+
+// -------------------------------------------------------------
+// NEW: API endpoint to extract series episodes from a URL
+// -------------------------------------------------------------
+app.get('/api/series-episodes', async (req: Request, res: Response) => {
+  const seriesUrl = req.query.url as string;
+  if (!seriesUrl) {
+    return res.status(400).json({ error: 'Series URL is required' });
+  }
+
+  try {
+    const htmlResponse = await axios.get(seriesUrl, {
+      headers: { 
+        'Referer': process.env.SOURCE_REFERER || BASE_URL,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    });
+
+    const html = htmlResponse.data;
+    const $ = cheerio.load(html);
+    const episodes: { title: string, link: string }[] = [];
+
+    // The user suggested `#series-episodes .bg-primary2 a`
+    // Let's also add fallback selectors just in case
+    $('#series-episodes .bg-primary2 a, .episodes-list a, .tab-content.episodes a, a[href*="/episode/"]').each((_, el) => {
+      const linkEl = $(el);
+      const href = linkEl.attr('href');
+      let title = linkEl.text().trim();
+      
+      // Some titles might be just numbers or need cleanup
+      if (!title) {
+         title = linkEl.find('.title, h3, span').text().trim() || 'حلقة مجهولة';
+      }
+
+      if (href && !episodes.some(e => e.link.includes(href))) {
+        episodes.push({ 
+          title, 
+          link: href.startsWith('http') ? href : `${BASE_URL}${href}` 
+        });
+      }
+    });
+    
+    // Sort logic maybe? If they come in reverse order, reverse them? 
+    // They usually come from newest to oldest. We'll return them as they are.
+
+    res.json({ success: true, episodes });
+  } catch (error: any) {
+    console.error('Error extracting episodes:', error.message);
+    res.status(500).json({ error: 'Failed to extract episodes' });
+  }
+});
 
 // -------------------------------------------------------------
 // 5. API: Health & Server status

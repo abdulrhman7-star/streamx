@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Play, Copy, Check, Terminal, Code2, Globe, Send, Loader2 } from 'lucide-react';
+import { X, ArrowRight, Play, Copy, Check, Terminal, Code2, Globe, Send, Loader2 } from 'lucide-react';
 
 interface ApiTesterModalProps {
   isOpen: boolean;
@@ -75,9 +75,10 @@ export const ApiTesterModal: React.FC<ApiTesterModalProps> = ({ isOpen, onClose 
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded bg-[#1e293b] hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[#1e293b] hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition cursor-pointer"
           >
-            <X className="w-4 h-4" />
+            <ArrowRight className="w-4 h-4" />
+            <span className="text-sm font-medium">رجوع</span>
           </button>
         </div>
 

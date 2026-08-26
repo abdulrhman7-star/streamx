@@ -1,4 +1,4 @@
-import { MediaItem, MediaDetail, FeedResponse } from '../types';
+import { MediaItem, MediaDetail, FeedResponse, Episode } from '../types';
 
 export const API_BASE = '/api/v1';
 
@@ -70,5 +70,57 @@ export async function checkApiHealth(): Promise<{ status: string; target: string
     return await res.json();
   } catch {
     return { status: 'offline', target: 'https://ak.sv' };
+  }
+}
+
+/**
+ * Automatically scans series pages, extracts episode links, and caches them in localStorage
+ * to reduce API usage and improve performance.
+ */
+export async function autoResolveEpisodes(seriesUrl: string): Promise<Episode[]> {
+  const cacheKey = `episodes_cache_${seriesUrl}`;
+  
+  // 1. Check Local Cache
+  try {
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      const parsedCache = JSON.parse(cached);
+      // Cache TTL: 2 hours (in milliseconds)
+      const CACHE_TTL = 2 * 60 * 60 * 1000; 
+      if (Date.now() - parsedCache.timestamp < CACHE_TTL) {
+        console.log('Returned episodes from cache:', seriesUrl);
+        return parsedCache.data;
+      }
+    }
+  } catch (e) {
+    console.warn('Cache read error:', e);
+  }
+
+  // 2. Fetch from Network
+  try {
+    const res = await fetch(`/api/series-episodes?url=${encodeURIComponent(seriesUrl)}`);
+    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+    const data = await res.json();
+    
+    if (data.success && data.episodes) {
+      const episodes: Episode[] = data.episodes.map((ep: any, index: number) => ({
+        ...ep,
+        episodeNumber: ep.episodeNumber || index + 1
+      }));
+      // 3. Save to Cache
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify({
+          timestamp: Date.now(),
+          data: episodes
+        }));
+      } catch (e) {
+        console.warn('Cache write error:', e);
+      }
+      return episodes;
+    }
+    return [];
+  } catch (error) {
+    console.error('Error auto resolving episodes:', error);
+    throw error;
   }
 }

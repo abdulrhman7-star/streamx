@@ -1,7 +1,7 @@
 import React from 'react';
 import { MediaItem } from '../types';
 import { MediaCard } from './MediaCard';
-import { Bookmark, Trash2, X, Film, Sparkles } from 'lucide-react';
+import { Bookmark, Trash2, X, ArrowRight, Film, Sparkles } from 'lucide-react';
 
 interface FavoritesViewProps {
   favorites: MediaItem[];
@@ -53,9 +53,10 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({
             )}
             <button
               onClick={onClose}
-              className="p-1.5 rounded bg-[#1e293b] hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[#1e293b] hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition cursor-pointer"
             >
-              <X className="w-4 h-4" />
+              <ArrowRight className="w-4 h-4" />
+              <span className="text-sm font-medium">رجوع</span>
             </button>
           </div>
         </div>

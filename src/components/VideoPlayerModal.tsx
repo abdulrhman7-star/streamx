@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Plyr } from 'plyr-react';
 import 'plyr-react/plyr.css';
+import Hls from 'hls.js';
 import {
   X,
+  ArrowRight,
   ExternalLink,
   ShieldCheck,
   Server,
@@ -23,7 +25,7 @@ interface VideoServer {
   name: string;
   quality: string;
   badge: string;
-  type: 'video' | 'embed';
+  type: 'video' | 'embed' | 'hls';
   rawUrl: string;
 }
 
@@ -36,9 +38,18 @@ export function getProxyUrl(videoUrl: string): string {
   return `${backendBaseUrl}/api/proxy-video?url=${encodeURIComponent(videoUrl)}`;
 }
 
-export function detectMediaType(link: string): 'video' | 'embed' {
+export function detectMediaType(link: string): 'video' | 'embed' | 'hls' {
   if (!link) return 'video';
   const cleanLink = link.toLowerCase().trim();
+  
+  if (
+    cleanLink.includes('.m3u8') ||
+    cleanLink.includes('/hls/') ||
+    cleanLink.includes('playlist.m3u8')
+  ) {
+    return 'hls';
+  }
+
   if (
     cleanLink.includes('iframe') ||
     cleanLink.includes('youtube.com/embed') ||
@@ -56,15 +67,23 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({ url, title, 
   const servers: VideoServer[] = [
     {
       id: 'primary-stream',
-      name: 'سيرفر المشاهدة المباشر (MP4)',
-      quality: '1080p FHD',
+      name: detectedPrimaryType === 'hls' ? 'بث تلقائي (HLS Stream)' : 'سيرفر المشاهدة المباشر (MP4)',
+      quality: detectedPrimaryType === 'hls' ? 'Adaptive' : '1080p FHD',
       badge: 'المصدر الأساسي',
       type: detectedPrimaryType,
       rawUrl: url || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
     },
     {
+      id: 'cdn-hls',
+      name: 'سيرفر البث التكيفي (HLS)',
+      quality: 'Auto Multi-Bitrate',
+      badge: 'مستقر',
+      type: 'hls',
+      rawUrl: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+    },
+    {
       id: 'cdn-1',
-      name: 'سيرفر اكوام البديل',
+      name: 'سيرفر اكوام البديل (MP4)',
       quality: '720p HD',
       badge: 'سريع',
       type: 'video',
@@ -82,6 +101,19 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({ url, title, 
 
   const [selectedServerIndex, setSelectedServerIndex] = useState(0);
   const currentServer = servers[selectedServerIndex];
+  
+  const hlsRef = useRef<Hls | null>(null);
+  const playerRef = useRef<any>(null);
+
+  // Clean up HLS when server changes or component unmounts
+  useEffect(() => {
+    return () => {
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+    };
+  }, [selectedServerIndex]);
 
   // Keyboard shortcut listener
   useEffect(() => {
@@ -97,6 +129,72 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({ url, title, 
   if (!url) return null;
 
   const proxiedUrl = getProxyUrl(currentServer.rawUrl);
+
+  const setupHls = (player: any) => {
+      if (!player) return;
+      const videoElement = player.elements.original;
+      
+      if (currentServer.type === 'hls') {
+        if (Hls.isSupported()) {
+           if (hlsRef.current) {
+              hlsRef.current.destroy();
+           }
+           const hls = new Hls({
+            enableWorker: true,
+            lowLatencyMode: true,
+           });
+           
+           hls.loadSource(proxiedUrl);
+           hls.attachMedia(videoElement);
+           
+           hls.on(Hls.Events.MANIFEST_PARSED, function (event, data) {
+              // Map HLS levels to Plyr quality options
+              const availableQualities = hls.levels.map((l) => l.height)
+              
+              // Add Auto option
+              availableQualities.unshift(0);
+
+              player.options.quality = {
+                default: 0, 
+                options: availableQualities,
+                forced: true,
+                onChange: (e: number) => updateQuality(e, hls)
+              }
+              
+              const playPromise = player.play();
+              if (playPromise !== undefined) {
+                playPromise.catch((error: any) => console.log('Autoplay prevented:', error));
+              }
+           });
+           
+           hlsRef.current = hls;
+
+        } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
+           // Native HLS support (Safari)
+           videoElement.src = proxiedUrl;
+           videoElement.addEventListener('loadedmetadata', () => {
+              const playPromise = player.play();
+              if (playPromise !== undefined) {
+                playPromise.catch((error: any) => console.log('Autoplay prevented:', error));
+              }
+           });
+        }
+      }
+  }
+
+  const updateQuality = (newQuality: number, hls: Hls) => {
+    if (newQuality === 0) {
+      hls.currentLevel = -1; // Enable auto quality
+    } else {
+      hls.levels.forEach((level, levelIndex) => {
+        if (level.height === newQuality) {
+          console.log("Found quality match with " + newQuality);
+          hls.currentLevel = levelIndex;
+        }
+      });
+    }
+  };
+
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-in fade-in" dir="rtl">
@@ -133,30 +231,58 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({ url, title, 
             </a>
             <button
               onClick={onClose}
-              className="p-2 rounded-lg bg-slate-800 hover:bg-rose-900/50 text-slate-300 hover:text-rose-400 border border-slate-700 transition-colors cursor-pointer"
-              title="إغلاق"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors cursor-pointer"
+              title="رجوع للخلف"
             >
-              <X className="w-4 h-4" />
+              <ArrowRight className="w-4 h-4" />
+              <span className="text-sm font-medium">رجوع</span>
             </button>
           </div>
         </div>
 
         {/* Player Viewport */}
         <div className="relative aspect-video w-full bg-black flex items-center justify-center overflow-hidden">
-          {currentServer.type === 'video' ? (
+          {currentServer.type !== 'embed' ? (
             <div className="w-full h-full" dir="ltr">
-              <Plyr
-                source={{
-                  type: 'video',
-                  sources: [{ src: proxiedUrl, type: 'video/mp4' }]
-                }}
-                options={{
-                  autoplay: true,
-                  controls: [
-                    'play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'captions', 'settings', 'pip', 'airplay', 'fullscreen'
-                  ]
-                }}
-              />
+              {currentServer.type === 'hls' ? (
+                 <Plyr
+                  ref={(ref) => {
+                    if (ref && ref.plyr) {
+                       playerRef.current = ref.plyr;
+                       setupHls(ref.plyr);
+                    }
+                  }}
+                  source={{
+                    type: 'video',
+                    sources: [{ src: proxiedUrl, type: 'video/mp4' }] // Dummy source, hls.js takes over
+                  }}
+                  options={{
+                    autoplay: true,
+                    controls: [
+                      'play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'settings', 'pip', 'airplay', 'fullscreen'
+                    ],
+                    settings: ['quality', 'speed'],
+                    i18n: {
+                       qualityLabel: {
+                           0: 'Auto',
+                       }
+                    }
+                  }}
+                />
+              ) : (
+                <Plyr
+                  source={{
+                    type: 'video',
+                    sources: [{ src: proxiedUrl, type: 'video/mp4' }]
+                  }}
+                  options={{
+                    autoplay: true,
+                    controls: [
+                      'play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'captions', 'settings', 'pip', 'airplay', 'fullscreen'
+                    ]
+                  }}
+                />
+              )}
             </div>
           ) : (
             <iframe
@@ -191,6 +317,8 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({ url, title, 
                   <div className="flex items-center gap-2">
                     {srv.type === 'video' ? (
                       <Play className="w-3.5 h-3.5 fill-current" />
+                    ) : srv.type === 'hls' ? (
+                       <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
                     ) : (
                       <Tv className="w-3.5 h-3.5" />
                     )}
@@ -208,3 +336,4 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({ url, title, 
     </div>
   );
 };
+
