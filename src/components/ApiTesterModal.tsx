@@ -21,7 +21,7 @@ export const ApiTesterModal: React.FC<ApiTesterModalProps> = ({ isOpen, onClose 
     { label: 'الصفحة الرئيسية (Home)', url: '/api/v1/feed/home?page=0' },
     { label: 'بحث: أفلام 2026', url: '/api/v1/search?q=&section=movie&year=2026' },
     { label: 'بحث: كلمة "Dark"', url: '/api/v1/search?q=Dark' },
-    { label: 'استخراج تفاصيل فيلم', url: '/api/v1/detail?url=https://ak.sv/movie/11330/dark' },
+    { label: 'استخراج تفاصيل فيلم', url: '/api/v1/detail?url=https://akwam.ss/movie/11330/dark' },
     { label: 'فحص الخادم (/api/health)', url: '/api/health' },
   ];
 

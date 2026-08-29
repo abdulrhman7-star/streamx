@@ -271,7 +271,7 @@ export default function App() {
 
           <div className="flex items-center gap-2 text-xs text-slate-400 font-mono bg-[#1e293b] px-3 py-1.5 rounded border border-slate-700">
             <Radio className="w-3.5 h-3.5 text-blue-400 animate-pulse" />
-            <span>المصدر: {sourceLabel === 'live_scraped' ? 'ak.sv المباشر' : 'المخزن السحابي الاحتياطي'}</span>
+            <span>المصدر: {sourceLabel === 'live_scraped' ? 'akwam.ss المباشر' : 'المخزن السحابي الاحتياطي'}</span>
           </div>
         </div>
 

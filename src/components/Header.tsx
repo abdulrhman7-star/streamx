@@ -42,7 +42,7 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1.5 font-medium text-slate-300">
               <span className={`w-2 h-2 rounded-full ${apiStatus === 'online' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
-              خادم الجلب والبروكسي: {apiStatus === 'online' ? 'متصل ومباشر (ak.sv)' : 'وضع الاحتياط النشط'}
+              خادم الجلب والبروكسي: {apiStatus === 'online' ? 'متصل ومباشر (akwam.ss)' : 'وضع الاحتياط النشط'}
             </span>
             <span className="hidden sm:inline-block text-slate-600">•</span>
             <span className="hidden sm:inline-block text-slate-400">استخراج روابط التحميل والمشاهدة بجودات 4K, 1080p, 720p</span>

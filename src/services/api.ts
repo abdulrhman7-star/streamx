@@ -66,10 +66,10 @@ export async function fetchMediaDetail(item: { id?: string; url?: string }): Pro
 export async function checkApiHealth(): Promise<{ status: string; target: string }> {
   try {
     const res = await fetch('/api/health');
-    if (!res.ok) return { status: 'offline', target: 'https://ak.sv' };
+    if (!res.ok) return { status: 'offline', target: 'https://akwam.ss' };
     return await res.json();
   } catch {
-    return { status: 'offline', target: 'https://ak.sv' };
+    return { status: 'offline', target: 'https://akwam.ss' };
   }
 }
 

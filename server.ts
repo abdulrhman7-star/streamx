@@ -7,7 +7,7 @@ import { createServer as createViteServer } from 'vite';
 
 const app = express();
 const PORT = 3000;
-const BASE_URL = 'https://ak.sv';
+const BASE_URL = process.env.AKWAM_BASE_URL || 'https://akwam.ss';
 
 app.use(cors());
 
@@ -27,13 +27,13 @@ function cleanVideoUrl(rawUrl: string): string {
   return cleaned;
 }
 
-// Realistic Browser Headers extracted from real ak.sv HAR requests
+// Realistic Browser Headers extracted from real akwam.ss HAR requests
 const DEFAULT_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
   'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
   'Accept-Language': 'ar-EG,ar;q=0.9,en-US;q=0.8,en;q=0.7',
   'X-Requested-With': 'XMLHttpRequest',
-  'Referer': 'https://ak.sv/',
+  'Referer': 'https://akwam.ss/',
   'sec-ch-ua': '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
   'sec-ch-ua-mobile': '?0',
   'sec-ch-ua-platform': '"Windows"',
@@ -92,12 +92,12 @@ export interface MediaDetail {
   }[];
 }
 
-// Fallback Mock Data from actual ak.sv HAR log to ensure 100% resilience if ak.sv changes/blocks
+// Fallback Mock Data from actual akwam.ss HAR log to ensure 100% resilience if akwam.ss changes/blocks
 const FALLBACK_MEDIA_DATABASE: ScrapedMediaItem[] = [
   {
     id: '11330',
     title: 'Dark',
-    link: 'https://ak.sv/movie/11330/dark',
+    link: 'https://akwam.ss/movie/11330/dark',
     poster: 'https://img.downet.net/thumb/178x260/uploads/Ea5Bm.jpg',
     rating: '6.1',
     quality: 'WEB-DL',
@@ -109,7 +109,7 @@ const FALLBACK_MEDIA_DATABASE: ScrapedMediaItem[] = [
   {
     id: '11329',
     title: 'Motor City',
-    link: 'https://ak.sv/movie/11329/motor-city',
+    link: 'https://akwam.ss/movie/11329/motor-city',
     poster: 'https://img.downet.net/thumb/178x260/uploads/599zZ.jpg',
     rating: '6.1',
     quality: 'WEB-DL',
@@ -121,7 +121,7 @@ const FALLBACK_MEDIA_DATABASE: ScrapedMediaItem[] = [
   {
     id: '11328',
     title: 'Above and Below',
-    link: 'https://ak.sv/movie/11328/above-and-below',
+    link: 'https://akwam.ss/movie/11328/above-and-below',
     poster: 'https://img.downet.net/thumb/178x260/uploads/UdjTF.jpg',
     rating: '6.0',
     quality: 'WEB-DL',
@@ -133,7 +133,7 @@ const FALLBACK_MEDIA_DATABASE: ScrapedMediaItem[] = [
   {
     id: '11327',
     title: 'Jackass: Best and Last',
-    link: 'https://ak.sv/movie/11327/jackass-best-and-last',
+    link: 'https://akwam.ss/movie/11327/jackass-best-and-last',
     poster: 'https://img.downet.net/thumb/178x260/uploads/rNc1T.jpg',
     rating: '6.3',
     quality: 'WEB-DL',
@@ -145,7 +145,7 @@ const FALLBACK_MEDIA_DATABASE: ScrapedMediaItem[] = [
   {
     id: '11326',
     title: 'Her Private Hell',
-    link: 'https://ak.sv/movie/11326/her-private-hell',
+    link: 'https://akwam.ss/movie/11326/her-private-hell',
     poster: 'https://img.downet.net/thumb/178x260/uploads/J9usG.jpg',
     rating: '5.0',
     quality: 'WEB-DL',
@@ -157,7 +157,7 @@ const FALLBACK_MEDIA_DATABASE: ScrapedMediaItem[] = [
   {
     id: '11325',
     title: 'Colony | Gunche',
-    link: 'https://ak.sv/movie/11325/colony-gunche',
+    link: 'https://akwam.ss/movie/11325/colony-gunche',
     poster: 'https://img.downet.net/thumb/178x260/uploads/pc4XA.jpg',
     rating: '6.5',
     quality: 'WEB-DL',
@@ -169,7 +169,7 @@ const FALLBACK_MEDIA_DATABASE: ScrapedMediaItem[] = [
   {
     id: '3109',
     title: 'WWE Monday Night Raw 24.08.2026 مترجم',
-    link: 'https://ak.sv/shows/3109/wwe-monday-night-raw-24-08-2026-مترجم',
+    link: 'https://akwam.ss/shows/3109/wwe-monday-night-raw-24-08-2026-مترجم',
     poster: 'https://img.downet.net/thumb/178x260/uploads/aB9hS.jpg',
     rating: '7.0',
     quality: 'WEB-DL',
@@ -181,7 +181,7 @@ const FALLBACK_MEDIA_DATABASE: ScrapedMediaItem[] = [
   {
     id: '11324',
     title: 'Rosebush Pruning',
-    link: 'https://ak.sv/movie/11324/rosebush-pruning',
+    link: 'https://akwam.ss/movie/11324/rosebush-pruning',
     poster: 'https://img.downet.net/thumb/178x260/uploads/1r2O3.jpg',
     rating: '6.0',
     quality: 'WEB-DL',
@@ -193,7 +193,7 @@ const FALLBACK_MEDIA_DATABASE: ScrapedMediaItem[] = [
   {
     id: '5697',
     title: 'مسلسل Lucky الموسم الأول',
-    link: 'https://ak.sv/series/5697/lucky',
+    link: 'https://akwam.ss/series/5697/lucky',
     poster: 'https://img.downet.net/thumb/178x260/uploads/nRnUq.jpg',
     rating: '7.0',
     quality: 'WEB-DL',
@@ -205,7 +205,7 @@ const FALLBACK_MEDIA_DATABASE: ScrapedMediaItem[] = [
   {
     id: '11323',
     title: 'Jana Nayagan',
-    link: 'https://ak.sv/movie/11323/jana-nayagan',
+    link: 'https://akwam.ss/movie/11323/jana-nayagan',
     poster: 'https://img.downet.net/thumb/178x260/uploads/hG2Et.jpg',
     rating: '6.0',
     quality: 'WEB-DL',
@@ -217,7 +217,7 @@ const FALLBACK_MEDIA_DATABASE: ScrapedMediaItem[] = [
   {
     id: '11322',
     title: 'Lenin',
-    link: 'https://ak.sv/movie/11322/lenin',
+    link: 'https://akwam.ss/movie/11322/lenin',
     poster: 'https://img.downet.net/thumb/178x260/uploads/Vuio1.jpg',
     rating: '7.5',
     quality: 'WEB-DL',
@@ -229,7 +229,7 @@ const FALLBACK_MEDIA_DATABASE: ScrapedMediaItem[] = [
   {
     id: '11321',
     title: 'حكاية لعبة Toy Story 5 مدبلج',
-    link: 'https://ak.sv/movie/11321/حكاية-لعبة-toy-story-5',
+    link: 'https://akwam.ss/movie/11321/حكاية-لعبة-toy-story-5',
     poster: 'https://img.downet.net/thumb/178x260/uploads/K2iPL.png',
     rating: '7.4',
     quality: 'WEB-DL',
@@ -241,7 +241,7 @@ const FALLBACK_MEDIA_DATABASE: ScrapedMediaItem[] = [
   {
     id: '11320',
     title: 'Ghost in the Cell',
-    link: 'https://ak.sv/movie/11320/ghost-in-the-cell',
+    link: 'https://akwam.ss/movie/11320/ghost-in-the-cell',
     poster: 'https://img.downet.net/thumb/178x260/uploads/R9rvR.jpg',
     rating: '7.1',
     quality: 'WEB-DL',
@@ -253,7 +253,7 @@ const FALLBACK_MEDIA_DATABASE: ScrapedMediaItem[] = [
   {
     id: '11319',
     title: 'Kattalan',
-    link: 'https://ak.sv/movie/11319/kattalan',
+    link: 'https://akwam.ss/movie/11319/kattalan',
     poster: 'https://img.downet.net/thumb/178x260/uploads/vhSz2.jpg',
     rating: '7.1',
     quality: 'WEB-DL',
@@ -265,7 +265,7 @@ const FALLBACK_MEDIA_DATABASE: ScrapedMediaItem[] = [
   {
     id: '11318',
     title: 'Back to the 90s',
-    link: 'https://ak.sv/movie/11318/back-to-the-90s',
+    link: 'https://akwam.ss/movie/11318/back-to-the-90s',
     poster: 'https://img.downet.net/thumb/178x260/uploads/Yagig.jpg',
     rating: '5.0',
     quality: 'WEB-DL',
@@ -277,7 +277,7 @@ const FALLBACK_MEDIA_DATABASE: ScrapedMediaItem[] = [
   {
     id: '11317',
     title: 'Billie Eilish: Hit Me Hard and Soft',
-    link: 'https://ak.sv/movie/11317/billie-eilish-hit-me-hard-and-soft',
+    link: 'https://akwam.ss/movie/11317/billie-eilish-hit-me-hard-and-soft',
     poster: 'https://img.downet.net/thumb/178x260/uploads/AnXc2.jpg',
     rating: '7.5',
     quality: 'WEB-DL',
@@ -289,7 +289,7 @@ const FALLBACK_MEDIA_DATABASE: ScrapedMediaItem[] = [
   {
     id: '11316',
     title: 'Bury the Devil',
-    link: 'https://ak.sv/movie/11316/bury-the-devil',
+    link: 'https://akwam.ss/movie/11316/bury-the-devil',
     poster: 'https://img.downet.net/thumb/178x260/uploads/H0QE6.jpg',
     rating: '5.0',
     quality: 'WEB-DL',
@@ -301,7 +301,7 @@ const FALLBACK_MEDIA_DATABASE: ScrapedMediaItem[] = [
   {
     id: '11314',
     title: 'Facing El Chapo',
-    link: 'https://ak.sv/movie/11314/facing-el-chapo',
+    link: 'https://akwam.ss/movie/11314/facing-el-chapo',
     poster: 'https://img.downet.net/thumb/178x260/uploads/vLgkN.jpg',
     rating: '6.6',
     quality: 'WEB-DL',
@@ -313,7 +313,7 @@ const FALLBACK_MEDIA_DATABASE: ScrapedMediaItem[] = [
   {
     id: '5680',
     title: 'مسلسل House of the Dragon الموسم الثاني',
-    link: 'https://ak.sv/series/5680/house-of-the-dragon',
+    link: 'https://akwam.ss/series/5680/house-of-the-dragon',
     poster: 'https://img.downet.net/thumb/178x260/uploads/UdjTF.jpg',
     rating: '8.7',
     quality: '1080p WebRip',
@@ -325,7 +325,7 @@ const FALLBACK_MEDIA_DATABASE: ScrapedMediaItem[] = [
   {
     id: '5685',
     title: 'مسلسل الحشاشين',
-    link: 'https://ak.sv/series/5685/al-hashashin',
+    link: 'https://akwam.ss/series/5685/al-hashashin',
     poster: 'https://img.downet.net/thumb/178x260/uploads/hG2Et.jpg',
     rating: '8.9',
     quality: 'HDTV 1080p',
@@ -336,7 +336,7 @@ const FALLBACK_MEDIA_DATABASE: ScrapedMediaItem[] = [
   }
 ];
 
-// Parser helper for ak.sv HTML structure
+// Parser helper for akwam.ss HTML structure
 function parseAkCards(html: string): ScrapedMediaItem[] {
   const $ = cheerio.load(html);
   const items: ScrapedMediaItem[] = [];
@@ -468,7 +468,7 @@ app.get('/api/v1/feed/:category', async (req: Request, res: Response) => {
     return res.json({
       success: true,
       source: 'resilient_cached',
-      notice: 'Data served via resilient buffer cache (Live connection to ak.sv fallback)',
+      notice: 'Data served via resilient buffer cache (Live connection to akwam.ss fallback)',
       category,
       page,
       count: paginated.length,
@@ -808,8 +808,8 @@ app.get('/api/v1/movie-details', async (req: Request, res: Response) => {
 // -------------------------------------------------------------
 const ALLOWED_HOTLINK_DOMAINS = [
   process.env.FRONTEND_URL || 'http://localhost:3000',
-  'https://ak.sv', // السماح لموقع ak.sv أو المواقع الشريكة بتضمين ملفاتك
-  'http://ak.sv'
+  'https://akwam.ss', // السماح لموقع akwam.ss أو المواقع الشريكة بتضمين ملفاتك
+  'http://akwam.ss'
 ];
 
 const hotlinkProtection = (req: Request, res: Response, next: NextFunction) => {

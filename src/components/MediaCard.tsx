@@ -20,7 +20,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
   const [imgError, setImgError] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Fallback poster if downet/ak.sv image is blocked
+  // Fallback poster if downet/akwam.ss image is blocked
   const defaultPoster =
     item.poster && !imgError
       ? item.poster
